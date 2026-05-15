@@ -19,6 +19,7 @@ import { Route as AuthenticatedSalaryStructuresRouteImport } from './routes/_aut
 import { Route as AuthenticatedSalaryComponentsRouteImport } from './routes/_authenticated/salary/components'
 import { Route as AuthenticatedPayrollRunRouteImport } from './routes/_authenticated/payroll/run'
 import { Route as AuthenticatedPayrollHistoryRouteImport } from './routes/_authenticated/payroll/history'
+import { Route as AuthenticatedPayrollIdRouteImport } from './routes/_authenticated/payroll/$id'
 import { Route as AuthenticatedEmployeesNewRouteImport } from './routes/_authenticated/employees/new'
 import { Route as AuthenticatedEmployeesIdRouteImport } from './routes/_authenticated/employees/$id'
 
@@ -75,6 +76,11 @@ const AuthenticatedPayrollHistoryRoute =
     path: '/payroll/history',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedPayrollIdRoute = AuthenticatedPayrollIdRouteImport.update({
+  id: '/payroll/$id',
+  path: '/payroll/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedEmployeesNewRoute =
   AuthenticatedEmployeesNewRouteImport.update({
     id: '/employees/new',
@@ -95,6 +101,7 @@ export interface FileRoutesByFullPath {
   '/onboard/$token': typeof OnboardTokenRoute
   '/employees/$id': typeof AuthenticatedEmployeesIdRoute
   '/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/payroll/$id': typeof AuthenticatedPayrollIdRoute
   '/payroll/history': typeof AuthenticatedPayrollHistoryRoute
   '/payroll/run': typeof AuthenticatedPayrollRunRoute
   '/salary/components': typeof AuthenticatedSalaryComponentsRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/onboard/$token': typeof OnboardTokenRoute
   '/employees/$id': typeof AuthenticatedEmployeesIdRoute
   '/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/payroll/$id': typeof AuthenticatedPayrollIdRoute
   '/payroll/history': typeof AuthenticatedPayrollHistoryRoute
   '/payroll/run': typeof AuthenticatedPayrollRunRoute
   '/salary/components': typeof AuthenticatedSalaryComponentsRoute
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/onboard/$token': typeof OnboardTokenRoute
   '/_authenticated/employees/$id': typeof AuthenticatedEmployeesIdRoute
   '/_authenticated/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/_authenticated/payroll/$id': typeof AuthenticatedPayrollIdRoute
   '/_authenticated/payroll/history': typeof AuthenticatedPayrollHistoryRoute
   '/_authenticated/payroll/run': typeof AuthenticatedPayrollRunRoute
   '/_authenticated/salary/components': typeof AuthenticatedSalaryComponentsRoute
@@ -138,6 +147,7 @@ export interface FileRouteTypes {
     | '/onboard/$token'
     | '/employees/$id'
     | '/employees/new'
+    | '/payroll/$id'
     | '/payroll/history'
     | '/payroll/run'
     | '/salary/components'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/onboard/$token'
     | '/employees/$id'
     | '/employees/new'
+    | '/payroll/$id'
     | '/payroll/history'
     | '/payroll/run'
     | '/salary/components'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/onboard/$token'
     | '/_authenticated/employees/$id'
     | '/_authenticated/employees/new'
+    | '/_authenticated/payroll/$id'
     | '/_authenticated/payroll/history'
     | '/_authenticated/payroll/run'
     | '/_authenticated/salary/components'
@@ -251,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPayrollHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/payroll/$id': {
+      id: '/_authenticated/payroll/$id'
+      path: '/payroll/$id'
+      fullPath: '/payroll/$id'
+      preLoaderRoute: typeof AuthenticatedPayrollIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/employees/new': {
       id: '/_authenticated/employees/new'
       path: '/employees/new'
@@ -272,6 +291,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEmployeesIdRoute: typeof AuthenticatedEmployeesIdRoute
   AuthenticatedEmployeesNewRoute: typeof AuthenticatedEmployeesNewRoute
+  AuthenticatedPayrollIdRoute: typeof AuthenticatedPayrollIdRoute
   AuthenticatedPayrollHistoryRoute: typeof AuthenticatedPayrollHistoryRoute
   AuthenticatedPayrollRunRoute: typeof AuthenticatedPayrollRunRoute
   AuthenticatedSalaryComponentsRoute: typeof AuthenticatedSalaryComponentsRoute
@@ -283,6 +303,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEmployeesIdRoute: AuthenticatedEmployeesIdRoute,
   AuthenticatedEmployeesNewRoute: AuthenticatedEmployeesNewRoute,
+  AuthenticatedPayrollIdRoute: AuthenticatedPayrollIdRoute,
   AuthenticatedPayrollHistoryRoute: AuthenticatedPayrollHistoryRoute,
   AuthenticatedPayrollRunRoute: AuthenticatedPayrollRunRoute,
   AuthenticatedSalaryComponentsRoute: AuthenticatedSalaryComponentsRoute,
