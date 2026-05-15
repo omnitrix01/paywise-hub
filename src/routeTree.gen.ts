@@ -9,38 +9,154 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedEmployeesIndexRouteImport } from './routes/_authenticated/employees/index'
+import { Route as AuthenticatedSalaryStructuresRouteImport } from './routes/_authenticated/salary/structures'
+import { Route as AuthenticatedSalaryComponentsRouteImport } from './routes/_authenticated/salary/components'
+import { Route as AuthenticatedEmployeesNewRouteImport } from './routes/_authenticated/employees/new'
+import { Route as AuthenticatedEmployeesIdRouteImport } from './routes/_authenticated/employees/$id'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRoute = AuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedEmployeesIndexRoute =
+  AuthenticatedEmployeesIndexRouteImport.update({
+    id: '/employees/',
+    path: '/employees/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSalaryStructuresRoute =
+  AuthenticatedSalaryStructuresRouteImport.update({
+    id: '/salary/structures',
+    path: '/salary/structures',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedSalaryComponentsRoute =
+  AuthenticatedSalaryComponentsRouteImport.update({
+    id: '/salary/components',
+    path: '/salary/components',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEmployeesNewRoute =
+  AuthenticatedEmployeesNewRouteImport.update({
+    id: '/employees/new',
+    path: '/employees/new',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedEmployeesIdRoute =
+  AuthenticatedEmployeesIdRouteImport.update({
+    id: '/employees/$id',
+    path: '/employees/$id',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/employees/$id': typeof AuthenticatedEmployeesIdRoute
+  '/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/salary/components': typeof AuthenticatedSalaryComponentsRoute
+  '/salary/structures': typeof AuthenticatedSalaryStructuresRoute
+  '/employees/': typeof AuthenticatedEmployeesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/employees/$id': typeof AuthenticatedEmployeesIdRoute
+  '/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/salary/components': typeof AuthenticatedSalaryComponentsRoute
+  '/salary/structures': typeof AuthenticatedSalaryStructuresRoute
+  '/employees': typeof AuthenticatedEmployeesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/employees/$id': typeof AuthenticatedEmployeesIdRoute
+  '/_authenticated/employees/new': typeof AuthenticatedEmployeesNewRoute
+  '/_authenticated/salary/components': typeof AuthenticatedSalaryComponentsRoute
+  '/_authenticated/salary/structures': typeof AuthenticatedSalaryStructuresRoute
+  '/_authenticated/employees/': typeof AuthenticatedEmployeesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/employees/$id'
+    | '/employees/new'
+    | '/salary/components'
+    | '/salary/structures'
+    | '/employees/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/employees/$id'
+    | '/employees/new'
+    | '/salary/components'
+    | '/salary/structures'
+    | '/employees'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/login'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/employees/$id'
+    | '/_authenticated/employees/new'
+    | '/_authenticated/salary/components'
+    | '/_authenticated/salary/structures'
+    | '/_authenticated/employees/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +164,77 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/employees/': {
+      id: '/_authenticated/employees/'
+      path: '/employees'
+      fullPath: '/employees/'
+      preLoaderRoute: typeof AuthenticatedEmployeesIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/salary/structures': {
+      id: '/_authenticated/salary/structures'
+      path: '/salary/structures'
+      fullPath: '/salary/structures'
+      preLoaderRoute: typeof AuthenticatedSalaryStructuresRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/salary/components': {
+      id: '/_authenticated/salary/components'
+      path: '/salary/components'
+      fullPath: '/salary/components'
+      preLoaderRoute: typeof AuthenticatedSalaryComponentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/employees/new': {
+      id: '/_authenticated/employees/new'
+      path: '/employees/new'
+      fullPath: '/employees/new'
+      preLoaderRoute: typeof AuthenticatedEmployeesNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/employees/$id': {
+      id: '/_authenticated/employees/$id'
+      path: '/employees/$id'
+      fullPath: '/employees/$id'
+      preLoaderRoute: typeof AuthenticatedEmployeesIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
+interface AuthenticatedRouteChildren {
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEmployeesIdRoute: typeof AuthenticatedEmployeesIdRoute
+  AuthenticatedEmployeesNewRoute: typeof AuthenticatedEmployeesNewRoute
+  AuthenticatedSalaryComponentsRoute: typeof AuthenticatedSalaryComponentsRoute
+  AuthenticatedSalaryStructuresRoute: typeof AuthenticatedSalaryStructuresRoute
+  AuthenticatedEmployeesIndexRoute: typeof AuthenticatedEmployeesIndexRoute
+}
+
+const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEmployeesIdRoute: AuthenticatedEmployeesIdRoute,
+  AuthenticatedEmployeesNewRoute: AuthenticatedEmployeesNewRoute,
+  AuthenticatedSalaryComponentsRoute: AuthenticatedSalaryComponentsRoute,
+  AuthenticatedSalaryStructuresRoute: AuthenticatedSalaryStructuresRoute,
+  AuthenticatedEmployeesIndexRoute: AuthenticatedEmployeesIndexRoute,
+}
+
+const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
+  AuthenticatedRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
