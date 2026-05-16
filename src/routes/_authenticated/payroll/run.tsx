@@ -14,6 +14,13 @@ export const Route = createFileRoute("/_authenticated/payroll/run")({ component:
 
 const STEPS = ["Period", "Employees", "Preview", "Finalize"] as const;
 
+function daysOverlapInMonth(from: string, to: string, month: number, year: number): number {
+  const start = new Date(Math.max(+new Date(from), +new Date(year, month - 1, 1)));
+  const end = new Date(Math.min(+new Date(to), +new Date(year, month, 0)));
+  if (end < start) return 0;
+  return Math.floor((+end - +start) / 86400000) + 1;
+}
+
 function RunPayroll() {
   const navigate = useNavigate();
   const today = new Date();
@@ -25,27 +32,89 @@ function RunPayroll() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [included, setIncluded] = useState<Record<string, boolean>>({});
   const [lop, setLop] = useState<Record<string, number>>({});
+  const [autoLop, setAutoLop] = useState<Record<string, { lop: number; paid: number; breakdown: string }>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (step !== 1 || employees.length) return;
     setLoading(true);
     (async () => {
-      const { data } = await supabase
-        .from("employees")
-        .select("id, emp_id, full_name, designation, department, status, pf_applicable, esi_applicable, pt_applicable, employee_salary(ctc, effective_from)")
-        .eq("status", "Active");
+      const [empRes, typesRes, reqRes] = await Promise.all([
+        supabase
+          .from("employees")
+          .select("id, emp_id, full_name, designation, department, status, pf_applicable, esi_applicable, pt_applicable, employee_salary(ctc, effective_from)")
+          .eq("status", "Active"),
+        supabase.from("leave_types").select("id, name, annual_entitlement"),
+        supabase.from("leave_requests").select("employee_id, leave_type_id, from_date, to_date, days, status").eq("status", "Approved"),
+      ]);
+      const data = empRes.data;
+      const types = typesRes.data ?? [];
+      const allReqs = reqRes.data ?? [];
       const list = (data ?? []).map((e: any) => ({
         ...e,
         ctc: (e.employee_salary ?? []).sort((a: any, b: any) => +new Date(b.effective_from) - +new Date(a.effective_from))[0]?.ctc ?? 0,
       }));
       setEmployees(list);
       const inc: Record<string, boolean> = {};
-      list.forEach((e) => { inc[e.id] = e.ctc > 0; });
+      const lopInit: Record<string, number> = {};
+      const autoInit: Record<string, { lop: number; paid: number; breakdown: string }> = {};
+      const typeById = new Map(types.map((t: any) => [t.id, t]));
+      const isUnpaidType = (n: string) => /unpaid|lop|loss\s*of\s*pay/i.test(n ?? "");
+
+      list.forEach((e) => {
+        inc[e.id] = e.ctc > 0;
+        // Approved leaves for this employee, all-time, for entitlement tracking
+        const empReqs = allReqs.filter((r: any) => r.employee_id === e.id);
+        // Prior usage (before this month) per type, to compute remaining balance
+        const monthStart = new Date(year, month - 1, 1);
+        const priorUsed = new Map<string, number>();
+        for (const r of empReqs) {
+          if (new Date(r.from_date) < monthStart) {
+            // Count days that fell before the payroll month
+            const days = Number(r.days) || 0;
+            const inMonth = daysOverlapInMonth(r.from_date, r.to_date, month, year);
+            const beforeMonth = Math.max(0, days - inMonth);
+            priorUsed.set(r.leave_type_id, (priorUsed.get(r.leave_type_id) ?? 0) + beforeMonth);
+          }
+        }
+        // Current month usage per type
+        const monthUsage = new Map<string, number>();
+        for (const r of empReqs) {
+          const d = daysOverlapInMonth(r.from_date, r.to_date, month, year);
+          if (d > 0) monthUsage.set(r.leave_type_id, (monthUsage.get(r.leave_type_id) ?? 0) + d);
+        }
+        let lopDays = 0;
+        let paidDays = 0;
+        const parts: string[] = [];
+        for (const [typeId, used] of monthUsage) {
+          const t: any = typeById.get(typeId);
+          if (!t) continue;
+          if (isUnpaidType(t.name)) {
+            lopDays += used;
+            parts.push(`${used}d ${t.name} (LOP)`);
+            continue;
+          }
+          const remaining = Math.max(0, (t.annual_entitlement ?? 0) - (priorUsed.get(typeId) ?? 0));
+          const paid = Math.min(used, remaining);
+          const lop = used - paid;
+          paidDays += paid;
+          lopDays += lop;
+          if (paid > 0 && lop > 0) parts.push(`${paid}d ${t.name} + ${lop}d LOP (over balance)`);
+          else if (lop > 0) parts.push(`${lop}d ${t.name} (LOP — no balance)`);
+          else if (paid > 0) parts.push(`${paid}d ${t.name}`);
+        }
+        lopInit[e.id] = lopDays;
+        autoInit[e.id] = { lop: lopDays, paid: paidDays, breakdown: parts.join(" · ") };
+      });
       setIncluded(inc);
+      setLop(lopInit);
+      setAutoLop(autoInit);
       setLoading(false);
     })();
-  }, [step]);
+  }, [step, month, year]);
+
+  // Reset cached data when period changes so leaves are re-fetched for the new month
+  useEffect(() => { setEmployees([]); setLop({}); setAutoLop({}); }, [month, year]);
 
   const computed = useMemo(() => employees.filter((e) => included[e.id]).map((e) => ({
     emp: e,
@@ -126,19 +195,45 @@ function RunPayroll() {
           loading ? <TableSkeleton /> : employees.length === 0 ? (
             <EmptyState title="No active employees" description="Add employees with a CTC before running payroll." />
           ) : (
-            <DataTable>
-              <thead className="bg-muted/40"><tr><Th>Include</Th><Th>Employee</Th><Th>CTC (Annual)</Th><Th>LOP Days</Th></tr></thead>
-              <tbody className="divide-y">
-                {employees.map((e) => (
-                  <tr key={e.id}>
-                    <Td><input type="checkbox" checked={!!included[e.id]} onChange={(ev) => setIncluded({ ...included, [e.id]: ev.target.checked })} /></Td>
-                    <Td><div className="font-medium">{e.full_name}</div><div className="text-xs text-muted-foreground font-mono">{e.emp_id}{e.ctc === 0 && " · No CTC"}</div></Td>
-                    <Td>{formatINR(e.ctc)}</Td>
-                    <Td><Input type="number" min={0} max={workingDays} className="h-8 w-20" value={lop[e.id] ?? 0} onChange={(ev) => setLop({ ...lop, [e.id]: Number(ev.target.value) })} /></Td>
-                  </tr>
-                ))}
-              </tbody>
-            </DataTable>
+            <div>
+              <div className="px-3 py-2 mb-3 text-xs bg-accent/40 border rounded-md text-muted-foreground">
+                LOP days are auto-calculated from approved leave requests for {periodLabel(month, year)}. Leaves beyond annual entitlement and unpaid leave types count as LOP. Override per employee if needed.
+              </div>
+              <DataTable>
+                <thead className="bg-muted/40"><tr><Th>Include</Th><Th>Employee</Th><Th>CTC (Annual)</Th><Th>Leave Summary</Th><Th>LOP Days</Th></tr></thead>
+                <tbody className="divide-y">
+                  {employees.map((e) => {
+                    const auto = autoLop[e.id];
+                    const current = lop[e.id] ?? 0;
+                    const overridden = auto && current !== auto.lop;
+                    return (
+                      <tr key={e.id}>
+                        <Td><input type="checkbox" checked={!!included[e.id]} onChange={(ev) => setIncluded({ ...included, [e.id]: ev.target.checked })} /></Td>
+                        <Td><div className="font-medium">{e.full_name}</div><div className="text-xs text-muted-foreground font-mono">{e.emp_id}{e.ctc === 0 && " · No CTC"}</div></Td>
+                        <Td>{formatINR(e.ctc)}</Td>
+                        <Td>
+                          {auto && (auto.paid > 0 || auto.lop > 0) ? (
+                            <div className="text-xs">
+                              <div className="text-secondary-foreground">{auto.breakdown}</div>
+                              <div className="text-muted-foreground mt-0.5">Paid: {auto.paid}d · LOP: {auto.lop}d</div>
+                            </div>
+                          ) : <span className="text-xs text-muted-foreground">No leaves</span>}
+                        </Td>
+                        <Td>
+                          <div className="flex items-center gap-2">
+                            <Input type="number" min={0} max={workingDays} className="h-8 w-20" value={current} onChange={(ev) => setLop({ ...lop, [e.id]: Number(ev.target.value) })} />
+                            {overridden && (
+                              <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setLop({ ...lop, [e.id]: auto!.lop })}>Reset</button>
+                            )}
+                          </div>
+                          {overridden && <div className="text-[11px] text-amber-600 mt-0.5">Overridden (auto: {auto!.lop})</div>}
+                        </Td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </div>
           )
         )}
 
