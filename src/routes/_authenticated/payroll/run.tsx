@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { DataTable, Th, Td, EmptyState, TableSkeleton } from "@/components/app/Table";
 import { calcPayroll, periodLabel } from "@/lib/payroll";
 import { formatINR, monthName } from "@/lib/format";
-import { Loader2, ChevronRight, ChevronLeft, CheckCircle2 } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, CheckCircle2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/payroll/run")({ component: RunPayroll });
@@ -32,7 +32,20 @@ function RunPayroll() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [included, setIncluded] = useState<Record<string, boolean>>({});
   const [lop, setLop] = useState<Record<string, number>>({});
-  const [autoLop, setAutoLop] = useState<Record<string, { lop: number; paid: number; breakdown: string }>>({});
+  type LeaveDetail = {
+    typeId: string;
+    name: string;
+    entitlement: number;
+    priorUsed: number;
+    remainingBefore: number;
+    usedThisMonth: number;
+    paid: number;
+    lop: number;
+    remainingAfter: number;
+    unpaidType: boolean;
+  };
+  const [autoLop, setAutoLop] = useState<Record<string, { lop: number; paid: number; breakdown: string; details: LeaveDetail[] }>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -57,7 +70,7 @@ function RunPayroll() {
       setEmployees(list);
       const inc: Record<string, boolean> = {};
       const lopInit: Record<string, number> = {};
-      const autoInit: Record<string, { lop: number; paid: number; breakdown: string }> = {};
+      const autoInit: Record<string, { lop: number; paid: number; breakdown: string; details: LeaveDetail[] }> = {};
       const typeById = new Map(types.map((t: any) => [t.id, t]));
       const isUnpaidType = (n: string) => /unpaid|lop|loss\s*of\s*pay/i.test(n ?? "");
 
@@ -86,25 +99,29 @@ function RunPayroll() {
         let lopDays = 0;
         let paidDays = 0;
         const parts: string[] = [];
-        for (const [typeId, used] of monthUsage) {
-          const t: any = typeById.get(typeId);
-          if (!t) continue;
-          if (isUnpaidType(t.name)) {
-            lopDays += used;
-            parts.push(`${used}d ${t.name} (LOP)`);
-            continue;
+        const details: LeaveDetail[] = [];
+        // Include all types so admins see remaining balance even when no leave was taken this month
+        for (const t of types as any[]) {
+          const used = monthUsage.get(t.id) ?? 0;
+          const prior = priorUsed.get(t.id) ?? 0;
+          const entitlement = t.annual_entitlement ?? 0;
+          const remainingBefore = Math.max(0, entitlement - prior);
+          const unpaid = isUnpaidType(t.name);
+          let paid = 0, lop = 0;
+          if (unpaid) { lop = used; }
+          else { paid = Math.min(used, remainingBefore); lop = used - paid; }
+          paidDays += paid; lopDays += lop;
+          const remainingAfter = unpaid ? remainingBefore : Math.max(0, remainingBefore - paid);
+          details.push({ typeId: t.id, name: t.name, entitlement, priorUsed: prior, remainingBefore, usedThisMonth: used, paid, lop, remainingAfter, unpaidType: unpaid });
+          if (used > 0) {
+            if (unpaid) parts.push(`${used}d ${t.name} (LOP)`);
+            else if (paid > 0 && lop > 0) parts.push(`${paid}d ${t.name} + ${lop}d LOP (over balance)`);
+            else if (lop > 0) parts.push(`${lop}d ${t.name} (LOP — no balance)`);
+            else parts.push(`${paid}d ${t.name}`);
           }
-          const remaining = Math.max(0, (t.annual_entitlement ?? 0) - (priorUsed.get(typeId) ?? 0));
-          const paid = Math.min(used, remaining);
-          const lop = used - paid;
-          paidDays += paid;
-          lopDays += lop;
-          if (paid > 0 && lop > 0) parts.push(`${paid}d ${t.name} + ${lop}d LOP (over balance)`);
-          else if (lop > 0) parts.push(`${lop}d ${t.name} (LOP — no balance)`);
-          else if (paid > 0) parts.push(`${paid}d ${t.name}`);
         }
         lopInit[e.id] = lopDays;
-        autoInit[e.id] = { lop: lopDays, paid: paidDays, breakdown: parts.join(" · ") };
+        autoInit[e.id] = { lop: lopDays, paid: paidDays, breakdown: parts.join(" · "), details };
       });
       setIncluded(inc);
       setLop(lopInit);
@@ -206,7 +223,10 @@ function RunPayroll() {
                     const auto = autoLop[e.id];
                     const current = lop[e.id] ?? 0;
                     const overridden = auto && current !== auto.lop;
+                    const isOpen = !!expanded[e.id];
+                    const hasDetails = !!auto?.details?.length;
                     return (
+                      <>
                       <tr key={e.id}>
                         <Td><input type="checkbox" checked={!!included[e.id]} onChange={(ev) => setIncluded({ ...included, [e.id]: ev.target.checked })} /></Td>
                         <Td><div className="font-medium">{e.full_name}</div><div className="text-xs text-muted-foreground font-mono">{e.emp_id}{e.ctc === 0 && " · No CTC"}</div></Td>
@@ -218,6 +238,13 @@ function RunPayroll() {
                               <div className="text-muted-foreground mt-0.5">Paid: {auto.paid}d · LOP: {auto.lop}d</div>
                             </div>
                           ) : <span className="text-xs text-muted-foreground">No leaves</span>}
+                          {hasDetails && (
+                            <button type="button" onClick={() => setExpanded({ ...expanded, [e.id]: !isOpen })}
+                              className="mt-1 inline-flex items-center gap-1 text-[11px] text-primary hover:underline">
+                              <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                              {isOpen ? "Hide" : "View"} entitlement breakdown
+                            </button>
+                          )}
                         </Td>
                         <Td>
                           <div className="flex items-center gap-2">
@@ -229,6 +256,57 @@ function RunPayroll() {
                           {overridden && <div className="text-[11px] text-amber-600 mt-0.5">Overridden (auto: {auto!.lop})</div>}
                         </Td>
                       </tr>
+                      {isOpen && hasDetails && (
+                        <tr key={`${e.id}-detail`} className="bg-muted/20">
+                          <Td className="!p-0" />
+                          <Td className="!py-3" />
+                          <Td className="!py-3" />
+                          <Td className="!py-3" colSpan={2}>
+                            <div className="rounded-md border bg-white">
+                              <table className="w-full text-xs">
+                                <thead className="bg-muted/40 text-muted-foreground">
+                                  <tr>
+                                    <th className="text-left px-3 py-2 font-medium">Leave Type</th>
+                                    <th className="text-right px-3 py-2 font-medium">Entitlement</th>
+                                    <th className="text-right px-3 py-2 font-medium">Used (prior)</th>
+                                    <th className="text-right px-3 py-2 font-medium">Balance</th>
+                                    <th className="text-right px-3 py-2 font-medium">This Month</th>
+                                    <th className="text-right px-3 py-2 font-medium text-emerald-700">Paid</th>
+                                    <th className="text-right px-3 py-2 font-medium text-amber-700">LOP</th>
+                                    <th className="text-right px-3 py-2 font-medium">Balance After</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {auto.details.map((d) => (
+                                    <tr key={d.typeId} className="border-t">
+                                      <td className="px-3 py-2">
+                                        {d.name}
+                                        {d.unpaidType && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-amber-700 bg-amber-50 border border-amber-200 rounded px-1">Unpaid</span>}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">{d.unpaidType ? "—" : d.entitlement}</td>
+                                      <td className="px-3 py-2 text-right text-muted-foreground">{d.unpaidType ? "—" : d.priorUsed}</td>
+                                      <td className="px-3 py-2 text-right">{d.unpaidType ? "—" : d.remainingBefore}</td>
+                                      <td className="px-3 py-2 text-right">{d.usedThisMonth || "—"}</td>
+                                      <td className="px-3 py-2 text-right text-emerald-700 font-medium">{d.paid || "—"}</td>
+                                      <td className="px-3 py-2 text-right text-amber-700 font-medium">{d.lop || "—"}</td>
+                                      <td className="px-3 py-2 text-right">{d.unpaidType ? "—" : d.remainingAfter}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                                <tfoot className="bg-muted/20">
+                                  <tr className="border-t">
+                                    <td className="px-3 py-2 font-medium" colSpan={5}>Total</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-emerald-700">{auto.paid}</td>
+                                    <td className="px-3 py-2 text-right font-semibold text-amber-700">{auto.lop}</td>
+                                    <td className="px-3 py-2" />
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </Td>
+                        </tr>
+                      )}
+                      </>
                     );
                   })}
                 </tbody>
