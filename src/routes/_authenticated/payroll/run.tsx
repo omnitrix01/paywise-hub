@@ -258,10 +258,10 @@ function RunPayroll() {
                       </tr>
                       {isOpen && hasDetails && (
                         <tr key={`${e.id}-detail`} className="bg-muted/20">
-                          <Td className="!p-0" />
-                          <Td className="!py-3" />
-                          <Td className="!py-3" />
-                          <Td className="!py-3" colSpan={2}>
+                          <td className="p-0" />
+                          <td className="p-0" />
+                          <td className="p-0" />
+                          <td className="py-3 px-3" colSpan={2}>
                             <div className="rounded-md border bg-white">
                               <table className="w-full text-xs">
                                 <thead className="bg-muted/40 text-muted-foreground">
@@ -303,7 +303,7 @@ function RunPayroll() {
                                 </tfoot>
                               </table>
                             </div>
-                          </Td>
+                          </td>
                         </tr>
                       )}
                       </>
