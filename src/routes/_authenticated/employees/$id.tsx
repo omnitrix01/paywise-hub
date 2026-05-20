@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PageHeader } from "@/components/app/PageHeader";
@@ -17,7 +17,9 @@ export const Route = createFileRoute("/_authenticated/employees/$id")({ componen
 
 function EmployeeDetail() {
   const { id } = Route.useParams();
+  const location = useLocation();
   const navigate = useNavigate();
+  const isEditRoute = location.pathname.endsWith("/edit");
   const [emp, setEmp] = useState<any>(null);
   const [salary, setSalary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +29,7 @@ function EmployeeDetail() {
   const createToken = useServerFn(createOnboardingToken);
 
   useEffect(() => {
+    if (isEditRoute) return;
     (async () => {
       const [{ data: e }, { data: s }, { data: p }] = await Promise.all([
         supabase.from("employees").select("*").eq("id", id).maybeSingle(),
@@ -35,7 +38,7 @@ function EmployeeDetail() {
       ]);
       setEmp(e); setSalary(s); setPayslips(p ?? []); setLoading(false);
     })();
-  }, [id]);
+  }, [id, isEditRoute]);
 
   const generateLink = async () => {
     setBusy(true);
@@ -63,6 +66,7 @@ function EmployeeDetail() {
     toast.success(`Marked ${next}`);
   };
 
+  if (isEditRoute) return <Outlet />;
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!emp) return <div className="text-center py-20 text-muted-foreground">Employee not found</div>;
 
